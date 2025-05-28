@@ -19,6 +19,8 @@
 #define RIGHT 77 //方向键：右
 #define SPACE 32 //暂停
 #define ESC 27 //退出
+int sleepTime = 300;  // 控制蛇的速度（值越小越快）
+int baseScore = 10;   // 基础得分
 
 //蛇头
 struct Snake
@@ -55,6 +57,8 @@ void DrawSnake(int flag);     // 打印蛇与覆盖蛇
 void MoveSnake(int x, int y); // 移动蛇
 void run(int x, int y);       // 执行按键
 void Game();                  // 游戏主体逻辑函数
+void speedup();      // 新增：加速函数
+void speeddown();    // 新增：减速函数
 
 int main()
 {
@@ -320,14 +324,15 @@ void JudgeFunc(int x, int y)
 {
 	//若蛇头即将到达的位置是食物，则得分
 	if (face[snake.y + y][snake.x + x] == FOOD)
-	{
-		snake.len++; //蛇身加长
-		grade += 10; //更新当前得分
-		color(7); //颜色设置为白色
-		CursorJump(0, ROW);
-		printf("当前得分:%d", grade); //重新打印当前得分
-		RandFood(); //重新随机生成食物
-	}
+{
+    snake.len++;
+    grade += baseScore;  // 使用baseScore计算得分
+    color(7);
+    CursorJump(0, ROW);
+    printf("当前得分:%d", grade);
+    speedup();  // 吃到食物加速
+    RandFood();
+}
 	//若蛇头即将到达的位置是墙或者蛇身，则游戏结束
 	else if (face[snake.y + y][snake.x + x] == WALL || face[snake.y + y][snake.x + x] == BODY)
 	{
@@ -375,7 +380,31 @@ void JudgeFunc(int x, int y)
 		}
 	}
 }
+// 新增加速函数
+void speedup()
+{
+    if (sleepTime > 10) {
+        sleepTime = 10;
+        baseScore += 2;
+    }
+    else if (sleepTime == 320) {
+        baseScore = 2;
+    }
+}
 
+// 新增减速函数
+void speeddown()
+{
+    if (sleepTime < 350) {
+        sleepTime += 30;
+        if (baseScore > 2) {
+            baseScore -= 2;
+        }
+    }
+    if (sleepTime == 350) {
+        baseScore = 1;
+    }
+}
 // 打印蛇与覆盖蛇
 void DrawSnake(int flag)
 {
@@ -425,26 +454,26 @@ void MoveSnake(int x, int y)
 // 执行按键
 void run(int x, int y)
 {
-	int t = 0;
-	while (1)
-	{
-		if (t == 0)
-			t = 3000; //这里t越小，蛇移动速度越快（可以根据此设置游戏难度）
-		while (--t)
-		{
-			if (kbhit() != 0) //若键盘被敲击，则退出循环
-				break;
-		}
-		if (t == 0) //键盘未被敲击
-		{
-			JudgeFunc(x, y); //判断到达该位置后，是否得分与游戏结束
-			MoveSnake(x, y); //移动蛇
-		}
-		else //键盘被敲击
-		{
-			break; //返回Game函数读取键值
-		}
-	}
+    int t = 0;
+    while (1)
+    {
+        if (t == 0)
+            t = sleepTime;  // 使用sleepTime控制速度
+        while (--t)
+        {
+            if (kbhit() != 0)
+                break;
+        }
+        if (t == 0)
+        {
+            JudgeFunc(x, y);
+            MoveSnake(x, y);
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 
 // 游戏主体逻辑函数
@@ -481,6 +510,12 @@ void Game()
 		default:
 			n = tmp; //其他键无效，默认为上一次蛇移动的方向
 			break;
+			case 59: // F1键（加速）
+    speedup();
+    break;
+case 60: // F2键（减速）
+    speeddown();
+    break;
 		}
 	first: //第一次进入循环先向默认方向前进
 		switch (n)
@@ -516,6 +551,12 @@ void Game()
 			system("cls"); //清空屏幕
 			main(); //重新执行主函数
 			break;
+			case 59: // F1键（加速）
+    speedup();
+    break;
+case 60: // F2键（减速）
+    speeddown();
+    break;
 		}
 	}
 }
