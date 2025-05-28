@@ -19,8 +19,12 @@
 #define RIGHT 77 //方向键：右
 #define SPACE 32 //暂停
 #define ESC 27 //退出
-int sleepTime = 300;  // 控制蛇的速度（值越小越快）
-int baseScore = 10;   // 基础得分
+#define SPDUP1 49
+#define SPDDOWN2 50
+
+int speedFactor = 100;  // 速度系数（百分比），100为正常速度
+int baseScore = 10;     // 基础得分
+const int BASE_INTERVAL = 6000; // 基准时间间隔（原3000的2倍）
 
 //蛇头
 struct Snake
@@ -57,14 +61,17 @@ void DrawSnake(int flag);     // 打印蛇与覆盖蛇
 void MoveSnake(int x, int y); // 移动蛇
 void run(int x, int y);       // 执行按键
 void Game();                  // 游戏主体逻辑函数
-void speedup();      // 新增：加速函数
-void speeddown();    // 新增：减速函数
+void speedup();				  // 加速函数
+void speeddown();			  // 减速函数
+
+
 
 int main()
 {
 #pragma warning (disable:4996) //消除警告
 	max = 0, grade = 0; //初始化变量
-
+	speedFactor = 100;   // 重置速度系数
+	baseScore = 10;      // 重置基础得分
 	// 显示欢迎界面
 	WelcomeInterface();
 
@@ -103,18 +110,18 @@ void WelcomeInterface()
 
 	// 绘制蛇形字符画
 	const char* snakeArt[] = {
-		"      ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■",
-		"    ■                                      ■",
-		"   ■          ■■■■■■■■■■■■■■          ■",
-		"  ■          ■                          ■          ■",
-		" ■          ■                          ■          ■",
-		"■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■",
-		"■                                          ■",
-		" ■                                        ■",
-		"  ■                                      ■",
-		"   ■                                    ■",
-		"    ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
-	};
+    "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■",
+    "■  ■  ■  ■",
+    "■  我真的有点服了■■■■■■■ ■■■■■■■■■■■■■■  ■",
+    "■  这个东西怎么画■  ■  ■  ■  ■  ■  ■",
+    "■  who can tell meee■■■■■■■ ■  ■  ■  ■",
+    "■  总之这是■  ■■■■■■  ■",
+    "■  蛇形字符画.jpg■  ■  ■  ■  ■  ■",
+    "■  程序设计我讨厌你■  ■  ■  ■  ■",
+    "■  ■■■■■■■■  ■■■■■■■■■  ■",
+    "■  ■",
+    "■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■"
+};
 
 	// 显示蛇形字符画
 	for (int i = 0; i < 11; i++) {
@@ -196,27 +203,35 @@ void GameInstructions()
 	CursorJump(25, 8);
 	printf("2. 操作说明:");
 	CursorJump(28, 9);
-	printf("   方向键(上/下/左/右): 控制蛇的移动方向");
+	printf("   方向键(↑/↓/←/→): 控制蛇的移动方向");
 	CursorJump(28, 10);
 	printf("   空格键: 暂停游戏");
 	CursorJump(28, 11);
 	printf("   ESC键: 退出游戏");
-	CursorJump(25, 13);
-	printf("3. 游戏规则:");
-	CursorJump(28, 14);
-	printf("   - 蛇吃到食物后长度增加，得分加10");
-	CursorJump(28, 15);
-	printf("   - 蛇碰到墙壁或自己的身体时游戏结束");
-	CursorJump(28, 16);
-	printf("   - 游戏会记录历史最高得分");
+	CursorJump(28, 12);
+	printf("   1键: 加速前进(得分+2)");
+	CursorJump(28, 13);
+	printf("   2键: 减速前进(得分-2)");
 
-	CursorJump(25, 19);
+	CursorJump(25, 15);
+	printf("3. 游戏规则:");
+	CursorJump(28, 16);
+	printf("   - 蛇吃到食物后长度增加，基础得分10分");
+	CursorJump(28, 17);
+	printf("   - 速度越快得分越高，速度越慢得分越低");
+	CursorJump(28, 18);
+	printf("   - 蛇碰到墙壁或自己的身体时游戏结束");
+	CursorJump(28, 19);
+	printf("   - 游戏会记录历史最高得分");
+	CursorJump(28, 20);
+	printf("   - 速度范围: 40%%~250%%，得分范围: 4~20分");
+
+	CursorJump(25, 22);
 	printf("按任意键返回主菜单...");
 	getch();
 	system("cls");
 	WelcomeInterface();
 }
-
 // 初始化界面
 void InitInterface()
 {
@@ -248,6 +263,8 @@ void InitInterface()
 	printf("当前得分:%d", grade);
 	CursorJump(COL, ROW);
 	printf("历史最高得分:%d", max);
+	CursorJump(COL, ROW + 1);  // 在得分下方新增一行
+	printf("当前速度: 100%%  (1加速, 2减速)");
 }
 
 // 颜色设置
@@ -324,15 +341,15 @@ void JudgeFunc(int x, int y)
 {
 	//若蛇头即将到达的位置是食物，则得分
 	if (face[snake.y + y][snake.x + x] == FOOD)
-{
-    snake.len++;
-    grade += baseScore;  // 使用baseScore计算得分
-    color(7);
-    CursorJump(0, ROW);
-    printf("当前得分:%d", grade);
-    speedup();  // 吃到食物加速
-    RandFood();
-}
+	{
+		snake.len++;
+		grade += baseScore;  // 使用baseScore计算得分
+		color(7);
+		CursorJump(0, ROW);
+		printf("当前得分:%d", grade);
+		speedup();  // 吃到食物加速
+		RandFood();
+	}
 	//若蛇头即将到达的位置是墙或者蛇身，则游戏结束
 	else if (face[snake.y + y][snake.x + x] == WALL || face[snake.y + y][snake.x + x] == BODY)
 	{
@@ -342,7 +359,7 @@ void JudgeFunc(int x, int y)
 		CursorJump(2 * (COL / 3), ROW / 2 - 3);
 		if (grade > max)
 		{
-			printf("恭喜你打破最高记录，最高记录更新为%d", grade);
+			printf("创纪录啦！最高分被你刷新啦，真棒！！！最高记录更新为%d", grade);
 			WriteGrade();
 		}
 		else if (grade == max)
@@ -351,7 +368,7 @@ void JudgeFunc(int x, int y)
 		}
 		else
 		{
-			printf("请继续加油，当前与最高记录相差%d", max - grade);
+			printf("继续努力吧~你离最高分还差:%d", max - grade);
 		}
 		CursorJump(2 * (COL / 3), ROW / 2);
 		printf("GAME OVER");
@@ -359,15 +376,15 @@ void JudgeFunc(int x, int y)
 		{
 			char ch;
 			CursorJump(2 * (COL / 3), ROW / 2 + 3);
-			printf("再来一局?(y/n):");
+			printf("再来一局?(1/2    1：重玩，2：退出游戏):");
 			scanf("%c", &ch);
 			while (getchar() != '\n'); // 清除缓冲区
-			if (ch == 'y' || ch == 'Y')
+			if (ch == '1')
 			{
 				system("cls");
 				main();
 			}
-			else if (ch == 'n' || ch == 'N')
+			else if (ch == '2')
 			{
 				CursorJump(2 * (COL / 3), ROW / 2 + 5);
 				exit(0);
@@ -380,31 +397,35 @@ void JudgeFunc(int x, int y)
 		}
 	}
 }
-// 新增加速函数
-void speedup()
-{
-    if (sleepTime > 10) {
-        sleepTime = 10;
-        baseScore += 2;
-    }
-    else if (sleepTime == 320) {
-        baseScore = 2;
-    }
+
+
+// 修改后的加速函数
+void speedup() {
+	if (speedFactor < 250) {  
+		speedFactor += 10;   
+		if (baseScore < 20) {
+			baseScore += 2;  
+		}    
+	}
+	// 更新控制台显示
+	CursorJump(COL + 20, ROW);
+	printf("当前速度: %d%%  (1加速, 2减速)", speedFactor);
 }
 
-// 新增减速函数
-void speeddown()
-{
-    if (sleepTime < 350) {
-        sleepTime += 30;
-        if (baseScore > 2) {
-            baseScore -= 2;
-        }
-    }
-    if (sleepTime == 350) {
-        baseScore = 1;
-    }
+// 修改后的减速函数
+void speeddown() {
+	if (speedFactor > 40) {   
+		speedFactor -= 10;    // 每次减速10%
+		if (baseScore > 5) {  // 最低得分为5
+			baseScore -= 2;   // 得分-2
+		}
+	}
+	// 更新控制台显示
+	CursorJump(COL + 20, ROW);
+	printf("当前速度: %d%%  (1加速, 2减速)", speedFactor);
 }
+
+
 // 打印蛇与覆盖蛇
 void DrawSnake(int flag)
 {
@@ -452,111 +473,67 @@ void MoveSnake(int x, int y)
 }
 
 // 执行按键
-void run(int x, int y)
-{
-    int t = 0;
-    while (1)
-    {
-        if (t == 0)
-            t = sleepTime;  // 使用sleepTime控制速度
-        while (--t)
-        {
-            if (kbhit() != 0)
-                break;
-        }
-        if (t == 0)
-        {
-            JudgeFunc(x, y);
-            MoveSnake(x, y);
-        }
-        else
-        {
-            break;
-        }
-    }
-}
+// 修改run函数
+void run(int x, int y) {
+	int t = 0;
+	while (1) {
+		if (t == 0)
+			t = BASE_INTERVAL * 100 / speedFactor;  // 使用新基准
 
+		while (--t) {
+			if (kbhit() != 0) break;
+		}
+
+		if (t == 0) {
+			JudgeFunc(x, y);
+			MoveSnake(x, y);
+		}
+		else {
+			break;
+		}
+	}
+}
 // 游戏主体逻辑函数
+// 游戏主体逻辑函数（仅修改部分）
 void Game()
 {
-	int n = RIGHT; //开始游戏时，默认向右移动
-	int tmp = 0; //记录蛇的移动方向
-	goto first; //第一次进入循环先向默认方向前进
+	int n = RIGHT;
+	int tmp = RIGHT; // 记录移动方向
+
 	while (1)
 	{
-		n = getch(); //读取键值
-		//在执行前，需要对所读取的按键进行调整
-		switch (n)
-		{
-		case UP:
-		case DOWN: //如果敲击的是“上”或“下”
-			if (tmp != LEFT && tmp != RIGHT) //并且上一次蛇的移动方向不是“左”或“右”
+		if (_kbhit()) { // 非阻塞检测按键
+			n = _getch();
+
+			switch (n)
 			{
-				n = tmp; //那么下一次蛇的移动方向设置为上一次蛇的移动方向
+			case UP: case DOWN: case LEFT: case RIGHT:
+				tmp = n; // 更新方向
+				break;
+
+			case SPDUP1: // 按1加速
+				speedup();
+				break;
+
+			case SPDDOWN2: // 按2减速
+				speeddown();
+				break;
+
+			case SPACE: // 暂停
+				system("pause>nul");
+				break;
+
+			case ESC: // 退出
+				exit(0);
 			}
-			break;
-		case LEFT:
-		case RIGHT: //如果敲击的是“左”或“右”
-			if (tmp != UP && tmp != DOWN) //并且上一次蛇的移动方向不是“上”或“下”
-			{
-				n = tmp; //那么下一次蛇的移动方向设置为上一次蛇的移动方向
-			}
-			break;
-		case SPACE:
-		case ESC:
-		case 'r':
-		case 'R':
-			break; //这四个无需调整
-		default:
-			n = tmp; //其他键无效，默认为上一次蛇移动的方向
-			break;
-			case 59: // F1键（加速）
-    speedup();
-    break;
-case 60: // F2键（减速）
-    speeddown();
-    break;
 		}
-	first: //第一次进入循环先向默认方向前进
-		switch (n)
-		{
-		case UP: //方向键：上
-			run(0, -1); //向上移动（横坐标偏移为0，纵坐标偏移为-1）
-			tmp = UP; //记录当前蛇的移动方向
-			break;
-		case DOWN: //方向键：下
-			run(0, 1); //向下移动（横坐标偏移为0，纵坐标偏移为1）
-			tmp = DOWN; //记录当前蛇的移动方向
-			break;
-		case LEFT: //方向键：左
-			run(-1, 0); //向左移动（横坐标偏移为-1，纵坐标偏移为0）
-			tmp = LEFT; //记录当前蛇的移动方向
-			break;
-		case RIGHT: //方向键：右
-			run(1, 0); //向右移动（横坐标偏移为1，纵坐标偏移为0）
-			tmp = RIGHT; //记录当前蛇的移动方向
-			break;
-		case SPACE: //暂停
-			system("pause>nul"); //暂停后按任意键继续
-			break;
-		case ESC: //退出
-			system("cls"); //清空屏幕
-			color(7); //颜色设置为白色
-			CursorJump(COL - 8, ROW / 2);
-			printf("  游戏结束  ");
-			CursorJump(COL - 8, ROW / 2 + 2);
-			exit(0);
-		case 'r':
-		case 'R': //重新开始
-			system("cls"); //清空屏幕
-			main(); //重新执行主函数
-			break;
-			case 59: // F1键（加速）
-    speedup();
-    break;
-case 60: // F2键（减速）
-    speeddown();
-    break;
+
+		// 持续移动（关键修改：不等待新按键）
+		switch (tmp) {
+		case UP:    run(0, -1); break;
+		case DOWN:  run(0, 1);  break;
+		case LEFT:  run(-1, 0); break;
+		case RIGHT: run(1, 0);  break;
 		}
 	}
 }
